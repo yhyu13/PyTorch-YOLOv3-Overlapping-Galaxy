@@ -263,8 +263,12 @@ def corp_img(img, labels, corp_ratio=3./4, corner=0):
     else:
         new_labels = labels
     
+    # bad corp
+    if len(new_labels) == 0:
+        return img_0, None
+        
     # if only one label, expand its batch size dim
-    if len(new_labels) == 5:
+    if new_labels.ndim == 1:
         new_labels = np.expand_dims(new_labels,axis=0)
         
     return img_0, new_labels
@@ -301,7 +305,9 @@ def generate_train_img_label(is_train=True,additional_label=0):
                     for corner in range(5):
                         corp_ratio = np.random.uniform(0.6, 0.8)
                         img_1, labels_1 = corp_img(img_0, labels_0, corp_ratio=corp_ratio, corner=corner)
-                        if len(labels_1) >= 1:
+                        if labels_1 is None:
+                            print("Pass {} Action {} Corner {}".format(img_id,action,corner))
+                        else:
                             img_name = '{}_action{}_corner{}'.format(img_id,action,corner)
                             # write image
                             cv2.imwrite(img_folder + img_name + '.png', img_1)
@@ -311,7 +317,9 @@ def generate_train_img_label(is_train=True,additional_label=0):
                             with open(label_folder + img_name + '.txt', 'w+') as f:
                                 for l in labels_1:
                                     # class, center x, center y, width, height
-                                    f.write('{} {} {} {} {}\n'.format(l[0],l[1]+l[3]/2.,l[2]+l[4]/2.,l[3],l[4]))
+                                    l[1] = l[1]+l[3]/2.
+                                    l[2] = l[2]+l[4]/2.
+                                    f.write('{} {} {} {} {}\n'.format(*l))
 
 if __name__=='__main__':
     
