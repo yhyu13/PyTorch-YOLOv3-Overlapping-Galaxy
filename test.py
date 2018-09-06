@@ -18,22 +18,24 @@ from torchvision import datasets
 from torchvision import transforms
 from torch.autograd import Variable
 import torch.optim as optim
+from tqdm import tqdm
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epochs', type=int, default=200, help='number of epochs')
 parser.add_argument('--batch_size', type=int, default=16, help='size of each image batch')
-parser.add_argument('--model_config_path', type=str, default='config/yolov3.cfg', help='path to model config file')
-parser.add_argument('--data_config_path', type=str, default='config/coco.data', help='path to data config file')
-parser.add_argument('--weights_path', type=str, default='weights/yolov3.weights', help='path to weights file')
+parser.add_argument('--model_config_path', type=str, default='config/v0904yolov3.cfg', help='path to model config file')
+parser.add_argument('--data_config_path', type=str, default='config/v0904.data', help='path to data config file')
+parser.add_argument('--weights_path', type=str, default='checkpoints/yolov3.weights', help='path to weights file')
 parser.add_argument('--class_path', type=str, default='data/coco.names', help='path to class label file')
 parser.add_argument('--iou_thres', type=float, default=0.5, help='iou threshold required to qualify as detected')
 parser.add_argument('--conf_thres', type=float, default=0.5, help='object confidence threshold')
 parser.add_argument('--nms_thres', type=float, default=0.45, help='iou thresshold for non-maximum suppression')
 parser.add_argument('--n_cpu', type=int, default=0, help='number of cpu threads to use during batch generation')
-parser.add_argument('--img_size', type=int, default=416, help='size of each image dimension')
+parser.add_argument('--img_size', type=int, default=128, help='size of each image dimension')
+parser.add_argument('--max_objects', type=int, default=5, help='maximum number of objects to detect')
 parser.add_argument('--use_cuda', type=bool, default=True, help='whether to use cuda if available')
 opt = parser.parse_args()
-print(opt)
+#print(opt)
+
 
 cuda = torch.cuda.is_available() and opt.use_cuda
 
@@ -43,8 +45,11 @@ test_path       = data_config['valid']
 num_classes     = int(data_config['classes'])
 
 # Initiate model
-model = Darknet(opt.model_config_path)
-model.load_weights(opt.weights_path)
+model = Darknet(opt.model_config_path,opt.img_size)
+try:
+    model.load_weights(opt.weights_path)
+except:
+    print("Weight Loading Failed.")
 
 if cuda:
     model = model.cuda()
@@ -52,7 +57,7 @@ if cuda:
 model.eval()
 
 # Get dataloader
-dataset = ListDataset(test_path)
+dataset = ListDataset(test_path,opt.img_size,opt.max_objects)
 dataloader = torch.utils.data.DataLoader(dataset,
     batch_size=opt.batch_size, shuffle=False, num_workers=opt.n_cpu)
 
@@ -66,14 +71,15 @@ print ('Compute mAP...')
 outputs = []
 targets = None
 APs = []
-for batch_i, (_, imgs, targets) in enumerate(dataloader):
+for batch_i, (_, imgs, targets) in enumerate(tqdm(dataloader, total=len(dataloader))):
     imgs = Variable(imgs.type(Tensor))
     targets = targets.type(Tensor)
 
     with torch.no_grad():
         output = model(imgs)
-        output = non_max_suppression(output, 80, conf_thres=opt.conf_thres, nms_thres=opt.nms_thres)
+        output = non_max_suppression(output, 2, conf_thres=opt.conf_thres, nms_thres=opt.nms_thres)
 
+    #break
     # Compute average precision for each sample
     for sample_i in range(targets.size(0)):
         correct = []
@@ -87,6 +93,7 @@ for batch_i, (_, imgs, targets) in enumerate(dataloader):
             # If there are no detections but there are annotations mask as zero AP
             if annotations.size(0) != 0:
                 APs.append(0)
+                
             continue
 
         # Get detections sorted by decreasing confidence scores

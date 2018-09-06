@@ -1,0 +1,6 @@
+classes= 2
+train=data/v0904/train_catalog.txt
+valid=data/v0904/test_catalog.txt
+names=data/v0904.names
+backup=backup/
+eval=v0904

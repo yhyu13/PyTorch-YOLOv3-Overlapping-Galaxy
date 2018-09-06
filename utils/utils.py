@@ -144,6 +144,9 @@ def non_max_suppression(prediction, num_classes, conf_thres=0.5, nms_thres=0.4):
 
 def build_targets(pred_boxes, target, anchors, num_anchors, num_classes, dim, ignore_thres, img_dim):
     nB = target.size(0)
+    # assert pred_boxes and target has the same batch size dim
+    assert(nB == pred_boxes.shape[0])
+    gi_max, gj_max = pred_boxes.shape[2]-1, pred_boxes.shape[3]-1
     nA = num_anchors
     nC = num_classes
     dim = dim
@@ -169,8 +172,8 @@ def build_targets(pred_boxes, target, anchors, num_anchors, num_classes, dim, ig
             gw = target[b, t, 3] * dim
             gh = target[b, t, 4] * dim
             # Get grid box indices
-            gi = int(gx)
-            gj = int(gy)
+            gi = int(gx) if int(gx) <= gi_max else gi_max
+            gj = int(gy) if int(gy) <= gj_max else gj_max
             # Get shape of gt box
             gt_box = torch.FloatTensor(np.array([0, 0, gw, gh])).unsqueeze(0)
             # Get shape of anchor box
